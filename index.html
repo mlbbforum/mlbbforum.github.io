@@ -22,16 +22,18 @@
           <p class="text-xs text-gray-400">Komunitas Diskusi, Meta, & Mabar Mobile Legends</p>
         </div>
       </div>
-      <a href="https://discord.com" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold px-3 py-2 rounded-md transition shadow">
-        Gabung Discord
-      </a>
+      <div class="flex items-center gap-2">
+        <a href="https://discord.com" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold px-3 py-2 rounded-md transition shadow">
+          Gabung Discord
+        </a>
+      </div>
     </div>
   </header>
 
   <!-- MAIN CONTAINER -->
   <div class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 md:grid-cols-4 gap-6">
     
-    <!-- SIDEBAR KIRI (Kategori) -->
+    <!-- SIDEBAR KIRI (Kategori & Peraturan) -->
     <aside class="md:col-span-1 space-y-4">
       <div class="bg-[#131b2e] p-4 rounded-xl border border-gray-800">
         <h2 class="text-sm font-bold text-yellow-500 uppercase mb-3">Sub-Forum</h2>
@@ -56,13 +58,15 @@
 
     <!-- CONTENT AREA -->
     <main class="md:col-span-3">
+      
       <!-- 1. TAMPILAN DAFTAR THREAD -->
       <div id="threadListView" class="space-y-3">
         <div class="flex justify-between items-center mb-4">
           <h2 id="viewCategoryTitle" class="text-lg font-bold text-gray-200">Semua Topik Diskusi</h2>
+          <span id="loadingIndicator" class="text-xs text-yellow-500 hidden animate-pulse">Memuat data...</span>
         </div>
         <div id="threadsContainer" class="space-y-3">
-          <!-- Postingan/Thread akan dimuat dari JS di bawah -->
+          <!-- Postingan/Thread dimuat secara dinamis via JavaScript -->
         </div>
       </div>
 
@@ -71,7 +75,7 @@
         <button onclick="showHome()" class="text-xs text-yellow-500 hover:underline flex items-center gap-1 mb-2 font-bold">
           ← Kembali ke Daftar Thread
         </button>
-        <article class="bg-[#131b2e] p-6 rounded-xl border border-gray-800">
+        <article class="bg-[#131b2e] p-6 rounded-xl border border-gray-800 shadow-md">
           <span id="detailBadge" class="text-xs px-2 py-1 rounded bg-yellow-600/20 text-yellow-400 font-semibold uppercase"></span>
           <h2 id="detailTitle" class="text-2xl font-black text-white mt-2 mb-2"></h2>
           <p id="detailMeta" class="text-xs text-gray-400 border-b border-gray-800 pb-4 mb-4"></p>
@@ -79,32 +83,30 @@
         </article>
 
         <!-- AREA KOMENTAR DISQUS -->
-        <div class="bg-[#131b2e] p-6 rounded-xl border border-gray-800">
+        <div class="bg-[#131b2e] p-6 rounded-xl border border-gray-800 shadow-md">
           <h3 class="font-bold text-yellow-500 mb-4 uppercase text-sm">Kolom Komentar / Diskusi:</h3>
           <div id="disqus_thread"></div>
         </div>
       </div>
-    </main>
 
+    </main>
   </div>
 
   <!-- FOOTER -->
-  <footer class="bg-[#0e1422] border-t border-gray-800 py-4 text-center text-xs text-gray-500 mt-auto">
-    Forum MLBB Komunitas. Dibuat gratis menggunakan GitHub Pages & Disqus.
+  <footer class="bg-[#0e1422] border-t border-gray-800 py-4 text-center text-xs text-gray-500 mt-auto flex flex-col items-center gap-2">
+    <div>Forum MLBB Komunitas. Dibuat gratis menggunakan GitHub Pages & Disqus.</div>
+    <div>
+      <a href="admin.html" class="text-gray-600 hover:text-yellow-500 transition underline text-[11px]">Panel Admin</a>
+    </div>
   </footer>
 
-  <!-- SCRIPT DATA & DISQUS -->
+  <!-- SCRIPT LOGIC -->
   <script>
-    // ==========================================
-    // 1. GANTI INI DENGAN SHORTNAME DISQUS MILIKMU
-    // ==========================================
+    // Konfigurasi Shortname Disqus Kamu
     const DISQUS_SHORTNAME = "mlbbforum";
 
-    // ==========================================
-    // 2. DATA THREAD / POSTINGAN FORUM
-    // (Kamu bisa tambah, edit, atau hapus thread di sini)
-    // ==========================================
-    const forumData = [
+    // Data Cadangan (Fallback jika threads.json belum dibuat)
+    const fallbackData = [
       {
         id: "patch-meta-season",
         category: "meta",
@@ -134,9 +136,36 @@
       }
     ];
 
+    let forumData = [];
     let currentCategory = 'all';
 
-    // RENDER THREAD KE HALAMAN
+    // 1. Inisialisasi & Ambil Data dari threads.json
+    async function initForum() {
+      const loader = document.getElementById('loadingIndicator');
+      loader.classList.remove('hidden');
+
+      try {
+        // Fetch threads.json dengan anti-cache query
+        const res = await fetch('threads.json?t=' + Date.now());
+        if (!res.ok) throw new Error("File threads.json belum ada");
+        forumData = await res.json();
+      } catch (err) {
+        console.warn("Menggunakan data fallback:", err.message);
+        forumData = fallbackData;
+      } finally {
+        loader.classList.add('hidden');
+      }
+
+      // Cek apakah pengunjung membuka link spesifik (contoh: web.com/#patch-meta-season)
+      const hash = window.location.hash.replace('#', '').replace('!/', '');
+      if (hash && forumData.some(t => t.id === hash)) {
+        openThread(hash, false);
+      } else {
+        renderThreads();
+      }
+    }
+
+    // 2. Render List Thread
     function renderThreads() {
       const container = document.getElementById('threadsContainer');
       container.innerHTML = '';
@@ -145,15 +174,20 @@
         ? forumData 
         : forumData.filter(item => item.category === currentCategory);
 
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 py-4">Belum ada topik diskusi di kategori ini.</p>';
+        return;
+      }
+
       filtered.forEach(thread => {
         const card = document.createElement('div');
-        card.className = "bg-[#131b2e] hover:bg-[#1a253e] p-4 rounded-xl border border-gray-800 transition cursor-pointer flex flex-col justify-between";
-        card.onclick = () => openThread(thread.id);
+        card.className = "bg-[#131b2e] hover:bg-[#1a253e] p-4 rounded-xl border border-gray-800 transition cursor-pointer flex flex-col justify-between shadow";
+        card.onclick = () => openThread(thread.id, true);
         card.innerHTML = `
           <div>
             <span class="text-[10px] px-2 py-0.5 rounded bg-yellow-600/20 text-yellow-400 font-semibold uppercase">${thread.categoryName}</span>
             <h3 class="text-base font-bold text-gray-100 hover:text-yellow-400 mt-2">${thread.title}</h3>
-            <p class="text-xs text-gray-400 line-clamp-2 mt-1">${thread.content.substring(0, 100)}...</p>
+            <p class="text-xs text-gray-400 line-clamp-2 mt-1">${thread.content.substring(0, 120)}...</p>
           </div>
           <div class="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800/60 flex justify-between">
             <span>Oleh: <strong class="text-gray-400">${thread.author}</strong></span>
@@ -164,28 +198,36 @@
       });
     }
 
-    // BUKA THREAD & MUAT KOMENTAR DISQUS
-    function openThread(threadId) {
+    // 3. Buka Halaman Thread & Load Disqus
+    function openThread(threadId, updateHistory = true) {
       const thread = forumData.find(t => t.id === threadId);
       if (!thread) return;
 
+      if (updateHistory) {
+        window.location.hash = '#!/' + thread.id;
+      }
+
       document.getElementById('threadListView').classList.add('hidden');
       document.getElementById('threadDetailView').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       document.getElementById('detailBadge').innerText = thread.categoryName;
       document.getElementById('detailTitle').innerText = thread.title;
       document.getElementById('detailMeta').innerText = `Diposting oleh ${thread.author} pada ${thread.date}`;
       document.getElementById('detailContent').innerText = thread.content;
 
-      // Inisialisasi atau Reset Disqus untuk Thread Terkait
       loadDisqus(thread.id, thread.title);
     }
 
+    // 4. Kembali ke Home
     function showHome() {
+      window.location.hash = '';
       document.getElementById('threadDetailView').classList.add('hidden');
       document.getElementById('threadListView').classList.remove('hidden');
+      renderThreads();
     }
 
+    // 5. Filter Berdasarkan Kategori
     function filterCategory(cat) {
       currentCategory = cat;
       const titles = {
@@ -196,10 +238,9 @@
       };
       document.getElementById('viewCategoryTitle').innerText = titles[cat];
       showHome();
-      renderThreads();
     }
 
-    // FUNGSI LOAD / RELOAD DISQUS
+    // 6. Integrasi Disqus Universal Script
     function loadDisqus(identifier, title) {
       const pageUrl = window.location.origin + window.location.pathname + '#!/' + identifier;
 
@@ -225,8 +266,18 @@
       }
     }
 
-    // Jalankan render awal
-    renderThreads();
+    // Listen tombol Back/Forward browser
+    window.addEventListener('popstate', () => {
+      const hash = window.location.hash.replace('#', '').replace('!/', '');
+      if (hash && forumData.some(t => t.id === hash)) {
+        openThread(hash, false);
+      } else {
+        showHome();
+      }
+    });
+
+    // Jalankan aplikasi
+    initForum();
   </script>
 </body>
 </html>
