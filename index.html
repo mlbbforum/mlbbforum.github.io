@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLBB Indonesia Forum Komunitas</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b0f19; color: #e2e8f0; }
+  </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- HEADER -->
+  <header class="bg-[#131b2e] border-b border-yellow-600/30 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showHome()">
+        <span class="text-2xl">⚔️</span>
+        <div>
+          <h1 class="font-black text-xl tracking-wider text-yellow-500 uppercase">MLBB FORUM ID</h1>
+          <p class="text-xs text-gray-400">Komunitas Diskusi, Meta, & Mabar Mobile Legends</p>
+        </div>
+      </div>
+      <a href="https://discord.com" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold px-3 py-2 rounded-md transition shadow">
+        Gabung Discord
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <div class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 md:grid-cols-4 gap-6">
+    
+    <!-- SIDEBAR KIRI (Kategori) -->
+    <aside class="md:col-span-1 space-y-4">
+      <div class="bg-[#131b2e] p-4 rounded-xl border border-gray-800">
+        <h2 class="text-sm font-bold text-yellow-500 uppercase mb-3">Sub-Forum</h2>
+        <ul class="space-y-1 text-sm">
+          <li><button onclick="filterCategory('all')" class="w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-gray-300">🔥 Semua Topik</button></li>
+          <li><button onclick="filterCategory('meta')" class="w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-gray-300">🛡️ Diskusi Meta & Patch</button></li>
+          <li><button onclick="filterCategory('mabar')" class="w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-gray-300">🎮 Cari Teman / Mabar</button></li>
+          <li><button onclick="filterCategory('build')" class="w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-gray-300">🗡️ Build Item & Hero</button></li>
+        </ul>
+      </div>
+
+      <!-- KOTAK ATURAN -->
+      <div class="bg-[#131b2e] p-4 rounded-xl border border-gray-800 text-xs text-gray-400">
+        <h3 class="font-bold text-gray-200 uppercase mb-2">Peraturan Komunitas:</h3>
+        <ol class="list-decimal list-inside space-y-1">
+          <li>Dilarang toxic & ujaran kebencian.</li>
+          <li>No SARA atau pornografi.</li>
+          <li>Dilarang jual beli akun / diamond ilegal.</li>
+        </ol>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <main class="md:col-span-3">
+      <!-- 1. TAMPILAN DAFTAR THREAD -->
+      <div id="threadListView" class="space-y-3">
+        <div class="flex justify-between items-center mb-4">
+          <h2 id="viewCategoryTitle" class="text-lg font-bold text-gray-200">Semua Topik Diskusi</h2>
+        </div>
+        <div id="threadsContainer" class="space-y-3">
+          <!-- Postingan/Thread akan dimuat dari JS di bawah -->
+        </div>
+      </div>
+
+      <!-- 2. TAMPILAN DETAIL THREAD + DISQUS -->
+      <div id="threadDetailView" class="hidden space-y-6">
+        <button onclick="showHome()" class="text-xs text-yellow-500 hover:underline flex items-center gap-1 mb-2 font-bold">
+          ← Kembali ke Daftar Thread
+        </button>
+        <article class="bg-[#131b2e] p-6 rounded-xl border border-gray-800">
+          <span id="detailBadge" class="text-xs px-2 py-1 rounded bg-yellow-600/20 text-yellow-400 font-semibold uppercase"></span>
+          <h2 id="detailTitle" class="text-2xl font-black text-white mt-2 mb-2"></h2>
+          <p id="detailMeta" class="text-xs text-gray-400 border-b border-gray-800 pb-4 mb-4"></p>
+          <div id="detailContent" class="text-sm text-gray-300 leading-relaxed space-y-3 whitespace-pre-line"></div>
+        </article>
+
+        <!-- AREA KOMENTAR DISQUS -->
+        <div class="bg-[#131b2e] p-6 rounded-xl border border-gray-800">
+          <h3 class="font-bold text-yellow-500 mb-4 uppercase text-sm">Kolom Komentar / Diskusi:</h3>
+          <div id="disqus_thread"></div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#0e1422] border-t border-gray-800 py-4 text-center text-xs text-gray-500 mt-auto">
+    Forum MLBB Komunitas. Dibuat gratis menggunakan GitHub Pages & Disqus.
+  </footer>
+
+  <!-- SCRIPT DATA & DISQUS -->
+  <script>
+    // ==========================================
+    // 1. GANTI INI DENGAN SHORTNAME DISQUS MILIKMU
+    // ==========================================
+    const DISQUS_SHORTNAME = "mlbbforum";
+
+    // ==========================================
+    // 2. DATA THREAD / POSTINGAN FORUM
+    // (Kamu bisa tambah, edit, atau hapus thread di sini)
+    // ==========================================
+    const forumData = [
+      {
+        id: "patch-meta-season",
+        category: "meta",
+        categoryName: "Meta & Patch",
+        title: "[Diskusi Patch] Siapa Roamer & Jungler Terkuat di Season Sekarang?",
+        author: "Admin_Tigreal",
+        date: "2026-09-20",
+        content: "Halo sobat MLBB!\n\nPatch baru sudah keluar, ada banyak hero assassin yang di-buff dan tank roamer yang dapat penyesuaian emblem.\n\nMenurut kalian, siapa yang saat ini wajib jadi prioritas First Pick atau Wajib Ban di tier Mythic ke atas? Yuk berdiskusi di bawah!"
+      },
+      {
+        id: "mabar-push-mythic",
+        category: "mabar",
+        categoryName: "Cari Teman",
+        title: "[Mabar] Cari Rekan 1 Party (Roam / Goldlane) Target Mythical Glory",
+        author: "FastHandsGusion",
+        date: "2026-09-19",
+        content: "Malam all, butuh teman mabar buat push rank malam ini sekitar jam 8 malam.\n\nSyarat:\n- Minimal Mythic 25 bintang\n- Paham makro dan mikro\n- Tidak toxic, ada mic kalau mau on voice\n\nSilakan tinggalkan ID Mobile Legends & Role kalian di kolom komentar!"
+      },
+      {
+        id: "build-item-assassin",
+        category: "build",
+        categoryName: "Build & Item",
+        title: "[Guide & Build] Racikan Item & Emblem Terbaik untuk Hero Assassin Burst",
+        author: "ProLancelot",
+        date: "2026-09-18",
+        content: "Banyak yang bingung apakah masih cocok pakai Hunter Strike duluan atau langsung Blade of Despair.\n\nDi sini saya mau bagikan racikan emblem yang paling sakit untuk rotasi cepat di early game. Gimana racikan versi kalian? Kasih tanggapan ya."
+      }
+    ];
+
+    let currentCategory = 'all';
+
+    // RENDER THREAD KE HALAMAN
+    function renderThreads() {
+      const container = document.getElementById('threadsContainer');
+      container.innerHTML = '';
+
+      const filtered = currentCategory === 'all' 
+        ? forumData 
+        : forumData.filter(item => item.category === currentCategory);
+
+      filtered.forEach(thread => {
+        const card = document.createElement('div');
+        card.className = "bg-[#131b2e] hover:bg-[#1a253e] p-4 rounded-xl border border-gray-800 transition cursor-pointer flex flex-col justify-between";
+        card.onclick = () => openThread(thread.id);
+        card.innerHTML = `
+          <div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-yellow-600/20 text-yellow-400 font-semibold uppercase">${thread.categoryName}</span>
+            <h3 class="text-base font-bold text-gray-100 hover:text-yellow-400 mt-2">${thread.title}</h3>
+            <p class="text-xs text-gray-400 line-clamp-2 mt-1">${thread.content.substring(0, 100)}...</p>
+          </div>
+          <div class="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800/60 flex justify-between">
+            <span>Oleh: <strong class="text-gray-400">${thread.author}</strong></span>
+            <span>📅 ${thread.date}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // BUKA THREAD & MUAT KOMENTAR DISQUS
+    function openThread(threadId) {
+      const thread = forumData.find(t => t.id === threadId);
+      if (!thread) return;
+
+      document.getElementById('threadListView').classList.add('hidden');
+      document.getElementById('threadDetailView').classList.remove('hidden');
+
+      document.getElementById('detailBadge').innerText = thread.categoryName;
+      document.getElementById('detailTitle').innerText = thread.title;
+      document.getElementById('detailMeta').innerText = `Diposting oleh ${thread.author} pada ${thread.date}`;
+      document.getElementById('detailContent').innerText = thread.content;
+
+      // Inisialisasi atau Reset Disqus untuk Thread Terkait
+      loadDisqus(thread.id, thread.title);
+    }
+
+    function showHome() {
+      document.getElementById('threadDetailView').classList.add('hidden');
+      document.getElementById('threadListView').classList.remove('hidden');
+    }
+
+    function filterCategory(cat) {
+      currentCategory = cat;
+      const titles = {
+        all: "Semua Topik Diskusi",
+        meta: "Diskusi Meta & Patch",
+        mabar: "Cari Teman / Mabar",
+        build: "Build Item & Hero"
+      };
+      document.getElementById('viewCategoryTitle').innerText = titles[cat];
+      showHome();
+      renderThreads();
+    }
+
+    // FUNGSI LOAD / RELOAD DISQUS
+    function loadDisqus(identifier, title) {
+      const pageUrl = window.location.origin + window.location.pathname + '#!/' + identifier;
+
+      if (window.DISQUS) {
+        DISQUS.reset({
+          reload: true,
+          config: function () {
+            this.page.identifier = identifier;
+            this.page.url = pageUrl;
+            this.page.title = title;
+          }
+        });
+      } else {
+        window.disqus_config = function () {
+          this.page.identifier = identifier;
+          this.page.url = pageUrl;
+          this.page.title = title;
+        };
+        const d = document, s = d.createElement('script');
+        s.src = `https://${DISQUS_SHORTNAME}.disqus.com/embed.js`;
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+      }
+    }
+
+    // Jalankan render awal
+    renderThreads();
+  </script>
+</body>
+</html>
