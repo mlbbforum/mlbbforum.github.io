@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MLBB Indonesia Forum Komunitas</title>
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDK (Google) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <style>
     body { background-color: #0b0f19; color: #e2e8f0; }
   </style>
@@ -22,10 +26,15 @@
           <p class="text-xs text-gray-400">Komunitas Diskusi, Meta, & Mabar Mobile Legends</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <a href="https://discord.com" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-black text-xs font-bold px-3 py-2 rounded-md transition shadow">
-          Gabung Discord
-        </a>
+      
+      <!-- AREA AUTH / LOGIN GOOGLE -->
+      <div class="flex items-center gap-3">
+        <div id="authArea">
+          <button onclick="loginGoogle()" class="bg-white hover:bg-gray-100 text-gray-900 text-xs font-bold px-3 py-2 rounded-md transition shadow flex items-center gap-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+            Login Admin
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -33,8 +42,16 @@
   <!-- MAIN CONTAINER -->
   <div class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 md:grid-cols-4 gap-6">
     
-    <!-- SIDEBAR KIRI (Kategori & Peraturan) -->
+    <!-- SIDEBAR KIRI -->
     <aside class="md:col-span-1 space-y-4">
+      <!-- TOMBOL BUAT THREAD (HANYA MUNCUL SETELAH ADMIN LOGIN) -->
+      <div id="adminPanel" class="hidden bg-[#131b2e] p-4 rounded-xl border border-yellow-500/40">
+        <h2 class="text-xs font-bold text-yellow-500 uppercase mb-2">⚡ Menu Admin</h2>
+        <button onclick="openModalCreate()" class="w-full py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg text-xs transition">
+          + Buat Thread Baru
+        </button>
+      </div>
+
       <div class="bg-[#131b2e] p-4 rounded-xl border border-gray-800">
         <h2 class="text-sm font-bold text-yellow-500 uppercase mb-3">Sub-Forum</h2>
         <ul class="space-y-1 text-sm">
@@ -45,29 +62,25 @@
         </ul>
       </div>
 
-      <!-- KOTAK ATURAN -->
       <div class="bg-[#131b2e] p-4 rounded-xl border border-gray-800 text-xs text-gray-400">
-        <h3 class="font-bold text-gray-200 uppercase mb-2">Peraturan Komunitas:</h3>
+        <h3 class="font-bold text-gray-200 uppercase mb-2">Peraturan:</h3>
         <ol class="list-decimal list-inside space-y-1">
           <li>Dilarang toxic & ujaran kebencian.</li>
           <li>No SARA atau pornografi.</li>
-          <li>Dilarang jual beli akun / diamond ilegal.</li>
+          <li>No cheat & jualan ilegal.</li>
         </ol>
       </div>
     </aside>
 
     <!-- CONTENT AREA -->
     <main class="md:col-span-3">
-      
       <!-- 1. TAMPILAN DAFTAR THREAD -->
       <div id="threadListView" class="space-y-3">
         <div class="flex justify-between items-center mb-4">
           <h2 id="viewCategoryTitle" class="text-lg font-bold text-gray-200">Semua Topik Diskusi</h2>
-          <span id="loadingIndicator" class="text-xs text-yellow-500 hidden animate-pulse">Memuat data...</span>
+          <span id="loadingText" class="text-xs text-yellow-500 animate-pulse">Memuat dari database...</span>
         </div>
-        <div id="threadsContainer" class="space-y-3">
-          <!-- Postingan/Thread dimuat secara dinamis via JavaScript -->
-        </div>
+        <div id="threadsContainer" class="space-y-3"></div>
       </div>
 
       <!-- 2. TAMPILAN DETAIL THREAD + DISQUS -->
@@ -75,97 +88,138 @@
         <button onclick="showHome()" class="text-xs text-yellow-500 hover:underline flex items-center gap-1 mb-2 font-bold">
           ← Kembali ke Daftar Thread
         </button>
-        <article class="bg-[#131b2e] p-6 rounded-xl border border-gray-800 shadow-md">
+        <article class="bg-[#131b2e] p-6 rounded-xl border border-gray-800 shadow">
           <span id="detailBadge" class="text-xs px-2 py-1 rounded bg-yellow-600/20 text-yellow-400 font-semibold uppercase"></span>
           <h2 id="detailTitle" class="text-2xl font-black text-white mt-2 mb-2"></h2>
           <p id="detailMeta" class="text-xs text-gray-400 border-b border-gray-800 pb-4 mb-4"></p>
-          <div id="detailContent" class="text-sm text-gray-300 leading-relaxed space-y-3 whitespace-pre-line"></div>
+          <div id="detailContent" class="text-sm text-gray-300 leading-relaxed whitespace-pre-line"></div>
         </article>
 
-        <!-- AREA KOMENTAR DISQUS -->
-        <div class="bg-[#131b2e] p-6 rounded-xl border border-gray-800 shadow-md">
-          <h3 class="font-bold text-yellow-500 mb-4 uppercase text-sm">Kolom Komentar / Diskusi:</h3>
+        <!-- DISQUS -->
+        <div class="bg-[#131b2e] p-6 rounded-xl border border-gray-800 shadow">
+          <h3 class="font-bold text-yellow-500 mb-4 uppercase text-sm">Kolom Komentar:</h3>
           <div id="disqus_thread"></div>
         </div>
       </div>
-
     </main>
+
   </div>
 
-  <!-- FOOTER -->
-  <footer class="bg-[#0e1422] border-t border-gray-800 py-4 text-center text-xs text-gray-500 mt-auto flex flex-col items-center gap-2">
-    <div>Forum MLBB Komunitas. Dibuat gratis menggunakan GitHub Pages & Disqus.</div>
-    <div>
-      <a href="admin.html" class="text-gray-600 hover:text-yellow-500 transition underline text-[11px]">Panel Admin</a>
+  <!-- MODAL BUAT THREAD BARU -->
+  <div id="modalCreate" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-[#131b2e] border border-gray-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-bold text-white text-base">Buat Thread Baru</h3>
+        <button onclick="closeModalCreate()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <form onsubmit="handleSaveThread(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Kategori</label>
+          <select id="formCategory" class="w-full px-3 py-2 bg-[#0b0f19] border border-gray-700 rounded-lg text-sm text-white focus:border-yellow-500">
+            <option value="meta|Meta & Patch">🛡️ Diskusi Meta & Patch</option>
+            <option value="mabar|Cari Teman">🎮 Cari Teman / Mabar</option>
+            <option value="build|Build & Item">🗡️ Build Item & Hero</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Judul</label>
+          <input type="text" id="formTitle" required class="w-full px-3 py-2 bg-[#0b0f19] border border-gray-700 rounded-lg text-sm text-white focus:border-yellow-500" placeholder="Judul thread...">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Isi Topik</label>
+          <textarea id="formContent" rows="4" required class="w-full px-3 py-2 bg-[#0b0f19] border border-gray-700 rounded-lg text-sm text-white focus:border-yellow-500" placeholder="Tulis isi thread..."></textarea>
+        </div>
+        <button type="submit" id="btnSubmitThread" class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg text-sm transition">
+          🚀 Terbitkan Langsung (Instan)
+        </button>
+      </form>
     </div>
+  </div>
+
+  <footer class="bg-[#0e1422] border-t border-gray-800 py-4 text-center text-xs text-gray-500 mt-auto">
+    Forum MLBB Komunitas. Dibuat dengan Firebase & Disqus.
   </footer>
 
   <!-- SCRIPT LOGIC -->
   <script>
-    // Konfigurasi Shortname Disqus Kamu
+    // ==========================================
+    // 1. GANTI DATA DI BAWAH INI
+    // ==========================================
     const DISQUS_SHORTNAME = "mlbbforum";
+    const ADMIN_EMAIL = "mlbbforumidn@gmail.com"; // GANTI DENGAN EMAIL GOOGLE KAMU!
 
-    // Data Cadangan (Fallback jika threads.json belum dibuat)
-    const fallbackData = [
-      {
-        id: "patch-meta-season",
-        category: "meta",
-        categoryName: "Meta & Patch",
-        title: "[Diskusi Patch] Siapa Roamer & Jungler Terkuat di Season Sekarang?",
-        author: "Admin_Tigreal",
-        date: "2026-09-20",
-        content: "Halo sobat MLBB!\n\nPatch baru sudah keluar, ada banyak hero assassin yang di-buff dan tank roamer yang dapat penyesuaian emblem.\n\nMenurut kalian, siapa yang saat ini wajib jadi prioritas First Pick atau Wajib Ban di tier Mythic ke atas? Yuk berdiskusi di bawah!"
-      },
-      {
-        id: "mabar-push-mythic",
-        category: "mabar",
-        categoryName: "Cari Teman",
-        title: "[Mabar] Cari Rekan 1 Party (Roam / Goldlane) Target Mythical Glory",
-        author: "FastHandsGusion",
-        date: "2026-09-19",
-        content: "Malam all, butuh teman mabar buat push rank malam ini sekitar jam 8 malam.\n\nSyarat:\n- Minimal Mythic 25 bintang\n- Paham makro dan mikro\n- Tidak toxic, ada mic kalau mau on voice\n\nSilakan tinggalkan ID Mobile Legends & Role kalian di kolom komentar!"
-      },
-      {
-        id: "build-item-assassin",
-        category: "build",
-        categoryName: "Build & Item",
-        title: "[Guide & Build] Racikan Item & Emblem Terbaik untuk Hero Assassin Burst",
-        author: "ProLancelot",
-        date: "2026-09-18",
-        content: "Banyak yang bingung apakah masih cocok pakai Hunter Strike duluan atau langsung Blade of Despair.\n\nDi sini saya mau bagikan racikan emblem yang paling sakit untuk rotasi cepat di early game. Gimana racikan versi kalian? Kasih tanggapan ya."
-      }
-    ];
+    const firebaseConfig = {
+  apiKey: "AIzaSyAWkGm-Zqcr0Gpo-PpDHQ31aze2CoT37e8",
+  authDomain: "mlbb-forum.firebaseapp.com",
+  projectId: "mlbb-forum",
+  storageBucket: "mlbb-forum.firebasestorage.app",
+  messagingSenderId: "618017157096",
+  appId: "1:618017157096:web:3176fafb82aacd503a7e5d",
+  measurementId: "G-JW2RTNLBMK"
+};
 
+    // INISIALISASI FIREBASE
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
     let forumData = [];
     let currentCategory = 'all';
 
-    // 1. Inisialisasi & Ambil Data dari threads.json
-    async function initForum() {
-      const loader = document.getElementById('loadingIndicator');
-      loader.classList.remove('hidden');
+    // CEK STATUS LOGIN GOOGLE
+    auth.onAuthStateChanged((user) => {
+      currentUser = user;
+      const authArea = document.getElementById('authArea');
+      const adminPanel = document.getElementById('adminPanel');
 
-      try {
-        // Fetch threads.json dengan anti-cache query
-        const res = await fetch('threads.json?t=' + Date.now());
-        if (!res.ok) throw new Error("File threads.json belum ada");
-        forumData = await res.json();
-      } catch (err) {
-        console.warn("Menggunakan data fallback:", err.message);
-        forumData = fallbackData;
-      } finally {
-        loader.classList.add('hidden');
-      }
-
-      // Cek apakah pengunjung membuka link spesifik (contoh: web.com/#patch-meta-season)
-      const hash = window.location.hash.replace('#', '').replace('!/', '');
-      if (hash && forumData.some(t => t.id === hash)) {
-        openThread(hash, false);
+      if (user && user.email === ADMIN_EMAIL) {
+        authArea.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-yellow-400 font-bold hidden sm:inline">Admin: ${user.displayName}</span>
+            <button onclick="logoutGoogle()" class="bg-red-600 hover:bg-red-500 text-white text-xs px-2.5 py-1.5 rounded transition">Keluar</button>
+          </div>
+        `;
+        adminPanel.classList.remove('hidden');
       } else {
-        renderThreads();
+        if (user && user.email !== ADMIN_EMAIL) {
+          alert('Login berhasil, tapi email ini bukan email admin yang terdaftar!');
+          auth.signOut();
+        }
+        authArea.innerHTML = `
+          <button onclick="loginGoogle()" class="bg-white hover:bg-gray-100 text-gray-900 text-xs font-bold px-3 py-2 rounded-md transition shadow flex items-center gap-2">
+            <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+            Login Admin
+          </button>
+        `;
+        adminPanel.classList.add('hidden');
       }
+      renderThreads();
+    });
+
+    // FUNGSI LOGIN & LOGOUT GOOGLE
+    function loginGoogle() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch((error) => alert('Login Gagal: ' + error.message));
+    }
+    function logoutGoogle() {
+      auth.signOut();
     }
 
-    // 2. Render List Thread
+    // REAL-TIME LISTENER: AMBIL DATA THREAD DARI DATABASE SECARA INSTAN
+    db.collection('threads').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+      document.getElementById('loadingText').classList.add('hidden');
+      forumData = [];
+      snapshot.forEach(doc => {
+        forumData.push({ id: doc.id, ...doc.data() });
+      });
+      renderThreads();
+    }, (error) => {
+      console.error(error);
+      document.getElementById('loadingText').innerText = "Gagal memuat database.";
+    });
+
+    // RENDER THREADS
     function renderThreads() {
       const container = document.getElementById('threadsContainer');
       container.innerHTML = '';
@@ -175,37 +229,77 @@
         : forumData.filter(item => item.category === currentCategory);
 
       if (filtered.length === 0) {
-        container.innerHTML = '<p class="text-sm text-gray-500 py-4">Belum ada topik diskusi di kategori ini.</p>';
+        container.innerHTML = '<p class="text-xs text-gray-500 py-4">Belum ada thread diskusi. Klik "+ Buat Thread Baru" untuk menambahkan.</p>';
         return;
       }
 
+      const isAdmin = currentUser && currentUser.email === ADMIN_EMAIL;
+
       filtered.forEach(thread => {
         const card = document.createElement('div');
-        card.className = "bg-[#131b2e] hover:bg-[#1a253e] p-4 rounded-xl border border-gray-800 transition cursor-pointer flex flex-col justify-between shadow";
-        card.onclick = () => openThread(thread.id, true);
+        card.className = "bg-[#131b2e] hover:bg-[#1a253e] p-4 rounded-xl border border-gray-800 transition flex justify-between items-start";
         card.innerHTML = `
-          <div>
+          <div class="cursor-pointer flex-grow pr-3" onclick="openThread('${thread.id}')">
             <span class="text-[10px] px-2 py-0.5 rounded bg-yellow-600/20 text-yellow-400 font-semibold uppercase">${thread.categoryName}</span>
             <h3 class="text-base font-bold text-gray-100 hover:text-yellow-400 mt-2">${thread.title}</h3>
-            <p class="text-xs text-gray-400 line-clamp-2 mt-1">${thread.content.substring(0, 120)}...</p>
+            <p class="text-xs text-gray-400 line-clamp-2 mt-1">${thread.content.substring(0, 100)}...</p>
+            <div class="text-[11px] text-gray-500 mt-3 flex gap-3">
+              <span>Oleh: <strong class="text-gray-400">${thread.author}</strong></span>
+              <span>📅 ${thread.date}</span>
+            </div>
           </div>
-          <div class="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800/60 flex justify-between">
-            <span>Oleh: <strong class="text-gray-400">${thread.author}</strong></span>
-            <span>📅 ${thread.date}</span>
-          </div>
+          ${isAdmin ? `<button onclick="deleteThread('${thread.id}')" class="text-red-400 hover:text-red-300 font-bold px-2 py-1 text-sm">✕</button>` : ''}
         `;
         container.appendChild(card);
       });
     }
 
-    // 3. Buka Halaman Thread & Load Disqus
-    function openThread(threadId, updateHistory = true) {
+    // SIMPAN THREAD BARU KE DATABASE (INSTAN)
+    async function handleSaveThread(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitThread');
+      btn.innerText = 'Menyimpan...';
+      btn.disabled = true;
+
+      const [catId, catName] = document.getElementById('formCategory').value.split('|');
+      const title = document.getElementById('formTitle').value.trim();
+      const content = document.getElementById('formContent').value.trim();
+
+      try {
+        await db.collection('threads').add({
+          category: catId,
+          categoryName: catName,
+          title: title,
+          content: content,
+          author: currentUser.displayName || 'Admin',
+          date: new Date().toISOString().split('T')[0],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        closeModalCreate();
+        document.getElementById('formTitle').value = '';
+        document.getElementById('formContent').value = '';
+      } catch (err) {
+        alert('Gagal menyimpan: ' + err.message);
+      } finally {
+        btn.innerText = '🚀 Terbitkan Langsung (Instan)';
+        btn.disabled = false;
+      }
+    }
+
+    // HAPUS THREAD
+    async function deleteThread(id) {
+      if (!confirm("Yakin mau menghapus thread ini?")) return;
+      try {
+        await db.collection('threads').doc(id).delete();
+      } catch (err) {
+        alert('Gagal menghapus: ' + err.message);
+      }
+    }
+
+    // DETAIL THREAD & DISQUS
+    function openThread(threadId) {
       const thread = forumData.find(t => t.id === threadId);
       if (!thread) return;
-
-      if (updateHistory) {
-        window.location.hash = '#!/' + thread.id;
-      }
 
       document.getElementById('threadListView').classList.add('hidden');
       document.getElementById('threadDetailView').classList.remove('hidden');
@@ -219,15 +313,12 @@
       loadDisqus(thread.id, thread.title);
     }
 
-    // 4. Kembali ke Home
     function showHome() {
-      window.location.hash = '';
       document.getElementById('threadDetailView').classList.add('hidden');
       document.getElementById('threadListView').classList.remove('hidden');
       renderThreads();
     }
 
-    // 5. Filter Berdasarkan Kategori
     function filterCategory(cat) {
       currentCategory = cat;
       const titles = {
@@ -240,7 +331,6 @@
       showHome();
     }
 
-    // 6. Integrasi Disqus Universal Script
     function loadDisqus(identifier, title) {
       const pageUrl = window.location.origin + window.location.pathname + '#!/' + identifier;
 
@@ -266,18 +356,9 @@
       }
     }
 
-    // Listen tombol Back/Forward browser
-    window.addEventListener('popstate', () => {
-      const hash = window.location.hash.replace('#', '').replace('!/', '');
-      if (hash && forumData.some(t => t.id === hash)) {
-        openThread(hash, false);
-      } else {
-        showHome();
-      }
-    });
-
-    // Jalankan aplikasi
-    initForum();
+    // MODAL HELPER
+    function openModalCreate() { document.getElementById('modalCreate').classList.remove('hidden'); }
+    function closeModalCreate() { document.getElementById('modalCreate').classList.add('hidden'); }
   </script>
 </body>
 </html>
